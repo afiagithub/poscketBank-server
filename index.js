@@ -1,4 +1,4 @@
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const express = require('express')
 const app = express()
 const cors = require('cors')
@@ -66,6 +66,18 @@ async function run() {
         next();
     }
 
+    const verifyAgent = async (req, res, next) => {
+        const email = req.decoded.email;
+        // console.log(email);
+        const query = { email: email };
+        const user = await userCollection.findOne(query);
+        const isAgent = user?.role === 'agent';
+        if (!isAgent) {
+            return res.status(403).send({ message: "forbidden access" })
+        }
+        next();
+    }
+
     app.get("/users/admin/:email", verifyToken, async (req, res) => {
         const email = req.params.email;
         if (email !== req.decoded.email) {
@@ -80,6 +92,20 @@ async function run() {
             // console.log(admin);
         }
         res.send({ admin })
+    })
+
+    app.get("/users/agent/:email", verifyToken, async (req, res) => {
+        const email = req.params.email;
+        if (email !== req.decoded.email) {
+            return res.status(403).send({ message: "forbidden access" })
+        }
+        const query = { email: email };
+        const user = await userCollection.findOne(query);
+        let agent = false;
+        if (user) {
+            agent = user?.role === 'agent'
+        }
+        res.send({ agent })
     })
 
     app.get("/user", async (req, res) => {
