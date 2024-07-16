@@ -108,17 +108,16 @@ async function run() {
         res.send({ agent })
     })
 
-    app.get("/user", async (req, res) => {
-        const email = req.query.email;
-        const pin = req.query.pin;
-        const query = { email: email, pin: pin};
-        const result = await userCollection.findOne(query);
-        res.send(result)
-    })
-
     app.post("/users", async (req, res) => {
         const user = req.body;
         const result = await userCollection.insertOne(user);
+        res.send(result)
+    })
+
+    app.get("/users/:email", verifyToken, async (req, res) => {
+        const email = req.params.email;
+        const query = { email: email };
+        const result = await userCollection.findOne(query);
         res.send(result)
     })
 
