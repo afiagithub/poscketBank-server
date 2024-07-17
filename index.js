@@ -303,6 +303,12 @@ async function run() {
             res.send(result)
         })
 
+        app.get("/agent-transac/:mobile", verifyToken, async(req, res) =>{
+            const mobile = req.params.mobile;
+            const result = await tranCollection.find({rcvr_mobile: mobile}).limit(20).toArray();
+            res.send(result)
+        })
+
         app.get("/alltransac", verifyToken, async(req, res) =>{
             const result = await tranCollection.find().toArray();
             res.send(result)
