@@ -242,6 +242,45 @@ async function run() {
             res.send(result)
         })
 
+        app.post("/cash-out", async (req, res) => {
+            const data = req.body;
+            const { mobile, rcvr_mobile, amount } = req.body;
+            const query = {
+                mobile: rcvr_mobile,
+                role: 'agent'
+            }
+            const rcvr = await userCollection.findOne(query);
+            if (!rcvr) {
+                res.send({ message: 'No Agent Found' })
+                return
+            }
+            const sender = await userCollection.findOne({mobile: mobile});
+            const updateSender = await userCollection.updateOne(
+                { mobile: mobile },
+                {
+                    $inc:
+                    {
+                        balance: -amount
+                    }
+                }
+            );
+            const updateRcvr = await userCollection.updateOne(
+                { mobile: rcvr_mobile },
+                {
+                    $inc:
+                    {
+                        balance: amount
+                    }
+                }
+            );
+            if (!updateSender || !updateRcvr) {
+                res.send({ message: 'Something went wrong' })
+                return
+            }
+            const result = await tranCollection.insertOne(data)
+            res.send(result)
+        })
+
         app.get("/transac/:email", verifyToken, async(req, res) =>{
             const email = req.params.email;
             const result = await tranCollection.find({email: email}).limit(10).toArray();
