@@ -3,6 +3,7 @@ const express = require('express')
 const app = express()
 const cors = require('cors')
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 require('dotenv').config()
 const port = process.env.PORT || 5000;
 
@@ -115,8 +116,18 @@ async function run() {
         })
 
         app.post("/users", async (req, res) => {
-            const user = req.body;
-            const result = await userCollection.insertOne(user);
+            const { name, email, pin, mobile, role, balance, status } = req.body;
+            const encryptedPin = await bcrypt.hash(pin, 10);
+            const newUser = {
+                name,
+                email,
+                pin: encryptedPin,
+                mobile,
+                role,
+                balance,
+                status
+            };
+            const result = await userCollection.insertOne(newUser);
             res.send(result)
         })
 
@@ -176,6 +187,18 @@ async function run() {
 
         })
 
+        app.post("/pin-check", async(req, res) => {
+            const {email, pin} = req.body;
+            const user = await userCollection.findOne({email: email});
+            if(!user){
+                return res.json({ error: "User Not Found" })
+            }
+            if (await bcrypt.compare(pin, user.pin)){
+                return res.json({status: 'ok'})
+            }
+            return res.json({ status: "Wrong PIN" })
+        })
+
         app.post("/transac", async (req, res) => {
             const data = req.body;
             const { mobile, rcvr_mobile, amount } = req.body;
@@ -188,6 +211,7 @@ async function run() {
                 res.send({ message: 'No Receiver Found' })
                 return
             }
+            const sender = await userCollection.findOne({mobile: mobile});
             const updateSender = await userCollection.updateOne(
                 { mobile: mobile },
                 {
@@ -197,12 +221,16 @@ async function run() {
                     }
                 }
             );
+            let rcvr_amount = amount;
+            if(amount > 100){
+                rcvr_amount = amount-5
+            }
             const updateRcvr = await userCollection.updateOne(
                 { mobile: rcvr_mobile },
                 {
                     $inc:
                     {
-                        balance: amount
+                        balance: rcvr_amount
                     }
                 }
             );
@@ -214,10 +242,20 @@ async function run() {
             res.send(result)
         })
 
+        app.get("/transac/:email", verifyToken, async(req, res) =>{
+            const email = req.params.email;
+            const result = await tranCollection.find({email: email}).limit(10).toArray();
+            res.send(result)
+        })
+
+        app.get("/alltransac", verifyToken, async(req, res) =>{
+            const result = await tranCollection.find().toArray();
+            res.send(result)
+        })
 
         // Send a ping to confirm a successful connection
-        await client.db("admin").command({ ping: 1 });
-        console.log("Pinged your deployment. You successfully connected to MongoDB!");
+        // await client.db("admin").command({ ping: 1 });
+        // console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
         // Ensures that the client will close when you finish/error
         // await client.close();
