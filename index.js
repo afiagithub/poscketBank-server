@@ -281,6 +281,22 @@ async function run() {
             res.send(result)
         })
 
+        app.post("/cash-in", async (req, res) => {
+            const data = req.body;
+            const { rcvr_mobile } = req.body;
+            const query = {
+                mobile: rcvr_mobile,
+                role: 'agent'
+            }
+            const rcvr = await userCollection.findOne(query);
+            if (!rcvr) {
+                res.send({ message: 'No Agent Found' })
+                return
+            }            
+            const result = await tranCollection.insertOne(data)
+            res.send(result)
+        })
+
         app.get("/transac/:email", verifyToken, async(req, res) =>{
             const email = req.params.email;
             const result = await tranCollection.find({email: email}).limit(10).toArray();
@@ -289,6 +305,57 @@ async function run() {
 
         app.get("/alltransac", verifyToken, async(req, res) =>{
             const result = await tranCollection.find().toArray();
+            res.send(result)
+        })
+
+        app.get("/cash-req/:mobile", async(req, res) =>{
+            const mobile = req.params.mobile;
+            const query = {
+                rcvr_mobile: mobile,
+                status: 'pending'
+            }
+            const result = await tranCollection.find(query).toArray();
+            res.send(result)
+        })
+
+        app.patch("/accept-req/:id", async(req, res) =>{
+            const id = req.params.id;
+            const query = {_id: new ObjectId(id)}
+            const tran = await tranCollection.findOne(query);
+            if(!tran){
+                res.send({ message: 'No Transaction Found' })
+                return
+            }
+            const cashAmount = tran.amount;
+            const updateSender = await userCollection.updateOne(
+                { mobile: tran.mobile },
+                {
+                    $inc:
+                    {
+                        balance: cashAmount
+                    }
+                }
+            );
+            const updateRcvr = await userCollection.updateOne(
+                { mobile: tran.rcvr_mobile },
+                {
+                    $inc:
+                    {
+                        balance: -cashAmount
+                    }
+                }
+            );
+            if (!updateSender || !updateRcvr) {
+                res.send({ message: 'Something went wrong' })
+                return
+            }
+            const filter = { _id: new ObjectId(id) };
+            const updatedDoc = {
+                $set: {
+                    status: 'complete'
+                }
+            }
+            const result = await tranCollection.updateOne(filter, updatedDoc);
             res.send(result)
         })
 
